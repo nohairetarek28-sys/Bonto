@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>لعبة بونطو - Tactical Pro</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, sans-serif; }
+        body { background-color: #1a1a2e; color: white; display: flex; flex-direction: column; height: 100vh; overflow: hidden; transition: background 0.3s; }
+        
+        #setup-screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(26, 26, 46, 0.95); z-index: 100; display: flex; justify-content: center; align-items: center; flex-direction: column; padding: 20px; overflow-y: auto; }
+        .setup-box { background: #222; padding: 30px; border-radius: 15px; border: 3px solid #ffcc00; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.8); max-width: 600px; width: 100%; }
+        .setup-box h2 { color: #ffcc00; margin-bottom: 20px; font-size: 28px; text-shadow: 0 0 10px rgba(255, 204, 0, 0.5); }
+        .rules-list { text-align: right; background: rgba(0,0,0,0.6); padding: 20px; border-radius: 10px; margin-bottom: 25px; font-size: 16px; line-height: 1.8; color: #eee; border: 1px solid #444; }
+        .rules-list li { margin-bottom: 12px; list-style: none; display: flex; align-items: flex-start; }
+        .rules-list li::before { content: '⚽'; margin-left: 10px; font-size: 14px; margin-top: 4px; }
+        .rules-list span { color: #ffcc00; font-weight: bold; }
+        .setup-box button { background: #38b000; color: white; border: none; padding: 15px 30px; font-size: 22px; font-weight: bold; border-radius: 8px; cursor: pointer; width: 100%; transition: 0.2s; box-shadow: 0 5px 15px rgba(56, 176, 0, 0.4); }
+        .setup-box button:hover { background: #2d8c00; transform: scale(1.05); }
+
+        .scoreboard { height: 85px; display: flex; justify-content: center; align-items: center; padding: 0 15px; background-color: #000; border-bottom: 3px solid #333; gap: 25px; z-index: 10; flex-shrink: 0; }
+        .player-score-card { display: flex; align-items: center; background-color: #004aad; border-radius: 8px; padding: 5px 20px; font-size: 24px; font-weight: bold; }
+        .player-score-card.opp { background-color: #c00000; }
+        .score-number { background: white; color: black; padding: 2px 15px; border-radius: 5px; margin-right: 15px; font-size: 28px; }
+        .timer-wrapper { display: flex; flex-direction: column; align-items: center; }
+        .half-text { color: #ffcc00; font-size: 14px; font-weight: bold; margin-bottom: 5px; }
+        .timer-badge { background-color: #ffcc00; color: black; font-size: 28px; font-weight: 900; padding: 2px 20px; border-radius: 8px; border: 2px solid white; letter-spacing: 2px; }
+
+        .arena { flex: 1; display: flex; justify-content: center; align-items: center; position: relative; flex-direction: column; overflow: hidden; }
+        .info-bar { position: absolute; top: 15px; display: flex; justify-content: space-between; align-items: center; width: 85%; z-index: 20; }
+        .action-text { font-size: 20px; font-weight: bold; color: #ffcc00; text-shadow: 2px 2px 4px #000; transition: 0.3s; background: rgba(0,0,0,0.6); padding: 5px 15px; border-radius: 10px; }
+        .moves-badge { background: rgba(0,0,0,0.8); border: 2px solid #fff; padding: 5px 15px; border-radius: 20px; font-size: 18px; font-weight: bold; color: #fff; }
+
+        .bonto-table { width: min(85vw, 55vh); height: min(85vw, 55vh); background-color: #38b000; border-radius: 50%; border: 12px solid #d35400; position: relative; box-shadow: 0 10px 40px rgba(0,0,0,0.6); background-image: radial-gradient(circle at center, transparent 30px, white 30px, white 33px, transparent 33px), linear-gradient(to right, transparent calc(50% - 1.5px), white calc(50% - 1.5px), white calc(50% + 1.5px), transparent calc(50% + 1.5px)); }
+        .logo-center { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) rotate(-15deg); font-size: 4vmin; font-weight: 900; color: #ffcc00; text-shadow: -2px -2px 0 #000, 2px -2px 0 #000, -2px 2px 0 #000, 2px 2px 0 #000; pointer-events: none; z-index: 2; }
+
+        .slots-container { position: absolute; width: 60%; height: 25%; left: 20%; display: flex; justify-content: space-between; align-items: center; }
+        .opp-side { top: 6%; } .plr-side { bottom: 6%; } 
+        
+        .slot { width: 18%; aspect-ratio: 2.5 / 3.5; border: 2px dashed rgba(255,255,255,0.6); border-radius: 6px; background: rgba(0,0,0,0.1); cursor: pointer; perspective: 1000px; transition: 0.3s; }
+        .card-inner { position: relative; width: 100%; height: 100%; transition: transform 0.6s; transform-style: preserve-3d; }
+        
+        .opp-side .slot.revealed .card-inner { transform: rotateY(180deg); } 
+        
+        .plr-side .slot .card-inner { transform: rotateY(180deg); }
+        .plr-side .slot:not(.revealed) .card-front { opacity: 0.85; filter: brightness(0.9); }
+        .plr-side .slot.revealed .card-front { box-shadow: 0 0 15px #ffcc00; opacity: 1; filter: brightness(1); border-color: #ffcc00; }
+        
+        .card-front, .card-back { position: absolute; width: 100%; height: 100%; backface-visibility: hidden; border-radius: 6px; display: flex; flex-direction: column; justify-content: center; align-items: center; }
+        .card-back { background: repeating-linear-gradient(45deg, #222, #222 8px, #111 8px, #111 16px); border: 2px dashed #ffcc00; color: #ffcc00; font-size: clamp(8px, 1.5vmin, 12px); font-weight: bold; }
+        .card-front { background: linear-gradient(135deg, #e5e5e5, #fff); border: 2px solid #fff; color: black; box-shadow: 0 4px 8px rgba(0,0,0,0.5); transform: rotateY(180deg); }
+        
+        .card-power { font-size: clamp(16px, 3vmin, 24px); font-weight: 900; }
+        .card-name { font-size: clamp(8px, 1.5vmin, 11px); font-weight: bold; text-align: center; line-height: 1.1; margin-top: 2px;}
+        
+        .atk { color: #c00000; } .def { color: #004aad; } .gk { color: #e67e22; } 
+        .legend-card-style { background: linear-gradient(135deg, #111, #444) !important; color: #ffcc00 !important; border-color: #ffcc00 !important; box-shadow: 0 0 10px #ffcc00; }
+
+        .controls-area { height: 140px; background: #111; border-top: 4px solid #ffcc00; display: flex; justify-content: center; align-items: center; flex-shrink: 0; padding: 10px 20px; z-index: 50; position: relative; gap: 20px; }
+        .btn-group { display: flex; flex-direction: column; gap: 10px; position: absolute; left: 20px; }
+        .game-btn { color: white; border: 2px solid #fff; padding: 8px 15px; font-size: 15px; font-weight: bold; border-radius: 8px; cursor: pointer; transition: 0.2s; }
+        .end-btn { background: #555; } .end-btn:hover:not(:disabled) { background: #777; transform: scale(1.05); }
+        .attack-btn { background: #d35400; font-size: 16px; } .attack-btn:hover:not(:disabled) { background: #e67e22; transform: scale(1.05); }
+        .confirm-atk-btn { background: #38b000; font-size: 16px; display: none; } .confirm-atk-btn:hover:not(:disabled) { background: #2d8c00; transform: scale(1.05); box-shadow: 0 0 10px #38b000; }
+        .ready-btn { background: #00e5ff; color: #000; font-size: 18px; border-color: #00e5ff; display: none; } .ready-btn:hover { background: #00b8cc; transform: scale(1.05); box-shadow: 0 0 15px #00e5ff; }
+        .game-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        .hand-area { display: flex; justify-content: center; align-items: center; gap: 10px; flex-wrap: wrap; max-width: 60%; }
+        .my-card { width: 70px; height: 100px; background: linear-gradient(135deg, #f5f7fa, #c3cfe2); color: black; border: 3px solid #fff; border-radius: 8px; cursor: pointer; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 5px; transition: transform 0.2s; box-shadow: 0 5px 10px rgba(0,0,0,0.5); position: relative; }
+        .my-card.selected { border-color: #ffcc00; transform: translateY(-10px); box-shadow: 0 0 15px #ffcc00; }
+        .my-card:hover:not(.disabled) { transform: translateY(-15px); border-color: #ffcc00; }
+        .my-card .power-badge { font-size: 24px; font-weight: 900; }
+        .my-card .name { font-size: 10px; font-weight: bold; text-align: center; margin-top: 5px; }
+        .disabled { pointer-events: none; opacity: 0.5; filter: grayscale(100%); }
+
+        .burn-selected { border-color: #ff4444 !important; transform: translateY(10px); background: linear-gradient(135deg, #555, #222) !important; color: #ccc; }
+        .burn-selected::after { content: '🔥'; position: absolute; font-size: 30px; text-shadow: 0 0 10px red; }
+        .legend-target { border-color: #ffcc00 !important; box-shadow: 0 0 20px #ffcc00; }
+
+        .highlight-attack { box-shadow: 0 0 20px rgba(0, 229, 255, 0.5) !important; border-color: #00e5ff !important; border-radius: 10px; }
+        .selected-attacker { transform: translateY(-15px) scale(1.1); box-shadow: 0 10px 20px #d35400 !important; border-color: #ffcc00 !important; }
+
+        #trailerAttackOverlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(10, 10, 20, 0.95); display: none; flex-direction: column; align-items: center; justify-content: center; z-index: 9999; backdrop-filter: blur(10px); }
+        .trailer-title { font-size: 35px; color: #ffcc00; font-weight: 900; margin-bottom: 20px; text-shadow: 0 0 15px #ffcc00; text-align: center; }
+        .trailer-bonto-card { width: 180px; height: 260px; background: linear-gradient(135deg, #e5e5e5, #fff); border-radius: 15px; border: 6px solid #ffcc00; display: flex; align-items: center; justify-content: center; font-size: 5rem; color: #1a1a2e; font-weight: 900; box-shadow: 0 0 40px #ffcc00; margin: 20px; animation: trailer-pulse 1s infinite alternate; }
+        @keyframes trailer-pulse { from { transform: scale(1); } to { transform: scale(1.08); } }
+        .trailer-btn { background: #38b000; color: white; border: 3px solid white; padding: 15px 40px; font-size: 26px; font-weight: bold; border-radius: 12px; cursor: pointer; transition: 0.3s; margin-top: 20px; }
+        .trailer-btn:hover { background: #2d8c00; transform: scale(1.1); box-shadow: 0 0 25px #38b000; }
+        .trailer-result { font-size: 28px; text-align: center; margin: 20px; color: white; line-height: 1.5; }
+
+        #maradonaPredictionBox { display: none; flex-direction: column; align-items: center; gap: 20px; }
+        .pred-btns { display: flex; gap: 20px; }
+        .pred-btn { padding: 15px 30px; font-size: 24px; font-weight: bold; border-radius: 10px; cursor: pointer; border: 3px solid #fff; transition: 0.2s; }
+        .pred-btn:hover { transform: scale(1.05); }
+        .btn-def { background: linear-gradient(135deg, #004aad, #002e73); color: white; }
+        .btn-atk { background: linear-gradient(135deg, #c00000, #800000); color: white; }
+    </style>
+</head>
+<body>
+
+    <div id="setup-screen">
+        <div class="setup-box">
+            <h2>بونطو التكتيكية - إزاي تلعب؟ 👑</h2>
+            <div class="rules-list">
+                <ul>
+                    <li><div><span>الهدف الأساسي:</span> سجل أهداف في الخصم أكتر قبل ما الوقت يخلص (20 دقيقة). الكروت مبتتمسحش بعد الأهداف، المهاجم بس اللي بيتحرق!</div></li>
+                    <li><div><span>الأدوار والحركات:</span> دورك بيبدأ بـ <span>3 حركات</span>. نزول كارت من إيدك للملعب بيخصم حركة. الهجوم برضه بيخصم حركات على حسب عدد المهاجمين.</div></li>
+                    <li><div><span>الهجوم:</span> دوس على "هجوم"، اختار مهاجم (أو 2 بالكتير) من ملعبك، وبعدين دوس "تأكيد الهجوم".</div></li>
+                    <li><div><span>الدعم الإضافي:</span> وأنت بتهاجم، اللعبة بتسحب لك "كارت بونطو" عشوائي يزود قوة هجومك الأساسية.</div></li>
+                    <li><div><span>الأساطير 🌟:</span> كروت خارقة زي بيليه، زيدان، رونالدينهو، وياشين. عشان تنزل أسطورة للملعب لازم <span>تحرق كارتين</span> من إيدك كضريبة.</div></li>
+                    <li><div><span>يد الله (مارادونا):</span> لو بتهاجم بمارادونا، هيطلب منك تتوقع نوع كارت الدعم اللي هيتسحب.. لو صح، الجول مضمون!</div></li>
+                </ul>
+            </div>
+            <button onclick="startGame()">فهمت.. يلا بينا! 🚀</button>
+        </div>
+    </div>
+
+    <div class="scoreboard">
+        <div class="player-score-card">
+            <span>أنت</span>
+            <span class="score-number" id="score-plr">0</span>
+        </div>
+        <div class="timer-wrapper">
+            <div class="half-text" id="half-indicator">الشوط الأول</div>
+            <div class="timer-badge" id="timer">20:00</div>
+        </div>
+        <div class="player-score-card opp">
+            <span class="score-number" id="score-opp">0</span>
+            <span>الخصم</span>
+        </div>
+    </div>
+
+    <div class="arena">
+        <div class="info-bar">
+            <div class="action-text" id="action-text"></div>
+            <div class="moves-badge" id="moves-badge" style="display: none;">الحركات: 3</div>
+        </div>
+
+        <div class="bonto-table">
+            <div class="logo-center">بونطو</div>
+            <div class="slots-container opp-side" id="opp-slots">
+                <div class="slot"></div><div class="slot"></div><div class="slot"></div><div class="slot"></div><div class="slot"></div>
+            </div>
+            <div class="slots-container plr-side" id="plr-slots">
+                <div class="slot" onclick="clickSlot(0)"></div>
+                <div class="slot" onclick="clickSlot(1)"></div>
+                <div class="slot" onclick="clickSlot(2)"></div>
+                <div class="slot" onclick="clickSlot(3)"></div>
+                <div class="slot" onclick="clickSlot(4)"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="controls-area">
+        <div class="btn-group">
+            <button class="game-btn attack-btn" id="attack-btn" style="display: none;" onclick="initiateAttackMode()">هجوم ⚔️</button>
+            <button class="game-btn confirm-atk-btn" id="confirm-attack-btn" onclick="confirmAttack()">تأكيد الهجوم 🎯</button>
+            <button class="game-btn end-btn" id="end-turn-btn" style="display: none;" onclick="endTurn()">إنهاء الدور 🛑</button>
+            <button class="game-btn ready-btn" id="ready-btn" onclick="finishSetup()">جاهز للعب! ✅</button>
+        </div>
+        <div class="hand-area" id="hand"></div>
+    </div>
+
+    <div id="trailerAttackOverlay">
+        <div class="trailer-title" id="trailerStatus">جاري التحضير للهجمة...</div>
+        
+        <div id="maradonaPredictionBox">
+            <div style="font-size: 24px; color: #fff; text-align: center;">توقع "يد الله"<br>الكارت اللي هيتسحب للدعم هيكون إيه؟</div>
+            <div class="pred-btns">
+                <button class="pred-btn btn-def" onclick="executeTrailerBonto('def')">مدافع / حارس</button>
+                <button class="pred-btn btn-atk" onclick="executeTrailerBonto('atk')">مهاجم</button>
+            </div>
+        </div>
+
+        <div id="trailerCardDisplay" class="trailer-bonto-card" style="display: none;">?</div>
+        <div id="trailerDetails" class="trailer-result"></div>
+        <button id="drawBontoBtn" class="trailer-btn" style="display: none;" onclick="executeTrailerBonto()">اسحب كارت الهجمة!</button>
+        <button id="closeAttackBtn" class="trailer-btn" style="display: none;" onclick="finishTrailerAttack()">العودة للملعب</button>
+    </div>
+
+    <script>
+        let fullDeckTemplate = [];
+        
+        // 5 أساطير
+        fullDeckTemplate.push({ name: "بيليه", attack: 8, defense: 0, type: "atk", display: "👑", legend: "pele" });
+        fullDeckTemplate.push({ name: "زيدان", attack: 8, defense: 0, type: "atk", display: "🪄", legend: "zidane" });
+        fullDeckTemplate.push({ name: "مارادونا", attack: 8, defense: 0, type: "atk", display: "🔟", legend: "maradona" });
+        fullDeckTemplate.push({ name: "رونالدينهو", attack: 8, defense: 0, type: "atk", display: "🤙", legend: "ronaldinho" });
+        fullDeckTemplate.push({ name: "ياشين", attack: 0, defense: 9, type: "gk", display: "🧤", legend: "yashin" });
+        
+        // كروت عادية 
+        for(let i=0; i<15; i++) { let p = Math.floor(Math.random()*3)+5; fullDeckTemplate.push({ name: "مدافع", attack: 0, defense: p, type: "def", display: p }); }
+        for(let i=0; i<5; i++) { let p = Math.floor(Math.random()*2)+8; fullDeckTemplate.push({ name: "حارس", attack: 0, defense: p, type: "gk", display: p }); }
+        for(let i=0; i<35; i++) { let p = Math.floor(Math.random()*3)+4; fullDeckTemplate.push({ name: "مهاجم", attack: p, defense: 0, type: "atk", display: p }); }
+
+        let activeDeck = [];
+        function shuffleDeck() { activeDeck = [...fullDeckTemplate].sort(() => Math.random() - 0.5); }
+        function drawCard() { 
+            if(activeDeck.length === 0) shuffleDeck(); 
+            return activeDeck.pop(); 
+        }
+        function drawNonLegendCard() {
+            if(activeDeck.length === 0) shuffleDeck();
+            let idx = activeDeck.findIndex(c => !c.legend);
+            if(idx === -1) { shuffleDeck(); idx = activeDeck.findIndex(c => !c.legend); }
+            return activeDeck.splice(idx, 1)[0];
+        }
+
+        let pScore = 0, oScore = 0, timeLeft = 20 * 60, timerInterval;
+        let pCardsOnTable = Array(5).fill(null), oCardsOnTable = Array(5).fill(null);
+        let myHandCards = [], pMoves = 3, isPlayerTurn = false;
+        let selectedHandIdx = null, isSelectingAttacker = false, isResolving = false;
+        let attackSelection = []; 
+        let isSetupPhase = false; 
+        let pendingLegendPlay = null; 
+
+        function startGame() {
+            document.getElementById('setup-screen').style.display = 'none';
+            pScore = 0; oScore = 0; myHandCards = [];
+            shuffleDeck();
+            
+            for(let i=0; i<5; i++) {
+                pCardsOnTable[i] = drawNonLegendCard(); 
+                oCardsOnTable[i] = drawNonLegendCard(); 
+                myHandCards.push(drawCard());
+            }
+            
+            isSetupPhase = true; 
+            document.getElementById('ready-btn').style.display = 'block';
+            document.getElementById('moves-badge').style.display = 'none'; 
+            
+            updateScoreBoard(); renderHand(); renderTable();
+            setActionText("مرحلة التجهيز: ظبط تشكيلتك قبل بداية الماتش!", "#00e5ff");
+        }
+
+        function finishSetup() {
+            isSetupPhase = false; pendingLegendPlay = null; selectedHandIdx = null;
+            document.getElementById('ready-btn').style.display = 'none';
+            document.getElementById('attack-btn').style.display = 'block';
+            document.getElementById('end-turn-btn').style.display = 'block';
+            document.getElementById('moves-badge').style.display = 'block';
+            startTimer(); startPlayerTurn(); 
+        }
+
+        function startTimer() {
+            clearInterval(timerInterval);
+            timerInterval = setInterval(() => {
+                if (timeLeft <= 0) { clearInterval(timerInterval); alert("نهاية الماتش!"); location.reload(); }
+                timeLeft--;
+                let m = Math.floor(timeLeft / 60); let s = timeLeft % 60;
+                document.getElementById('timer').innerText = (m < 10 ? '0' : '') + m + ':' + (s < 10 ? '0' : '') + s;
+            }, 1000);
+        }
+
+        function startPlayerTurn() {
+            isPlayerTurn = true; pMoves = 3;
+            myHandCards.push(drawCard(), drawCard());
+            if(myHandCards.length > 8) myHandCards = myHandCards.slice(0, 8); 
+            updateScoreBoard(); updateMovesBadge(); renderHand(); renderTable();
+            setActionText("الجيم بدأ! سحبت كارتين.. دورك 🃏", "#38b000");
+            document.getElementById('attack-btn').style.display = 'block';
+            document.getElementById('end-turn-btn').style.display = 'block';
+        }
+
+        function updateScoreBoard() {
+            document.getElementById('score-plr').innerText = pScore;
+            document.getElementById('score-opp').innerText = oScore;
+        }
+
+        function updateMovesBadge() {
+            document.getElementById('moves-badge').innerText = `الحركات: ${pMoves}`;
+        }
+
+        function setActionText(msg, color) {
+            const el = document.getElementById('action-text');
+            el.innerText = msg; el.style.color = color;
+        }
+
+        function renderHand() {
+            const hand = document.getElementById('hand'); hand.innerHTML = '';
+            myHandCards.forEach((card, index) => {
+                let div = document.createElement('div');
+                let isDisabled = (!isSetupPhase && (pMoves <= 0 || !isPlayerTurn)) ? 'disabled' : '';
+                let isBurnSelected = pendingLegendPlay && pendingLegendPlay.burnedIndices.includes(index);
+                let isLegendTarget = pendingLegendPlay && myHandCards[index] === pendingLegendPlay.legendCard;
+                let extraClass = card.legend ? "legend-card-style" : "";
+
+                div.className = `my-card ${extraClass} ${selectedHandIdx === index ? 'selected' : ''} ${isDisabled} ${isBurnSelected ? 'burn-selected' : ''} ${isLegendTarget ? 'legend-target' : ''}`;
+                div.innerHTML = `<div class="power-badge ${card.type}">${card.display}</div><div class="name">${card.name}</div>`;
+                
+                div.onclick = () => { 
+                    if(isSelectingAttacker) return; 
+
+                    if (pendingLegendPlay) {
+                        if (myHandCards[index] === pendingLegendPlay.legendCard) {
+                            pendingLegendPlay = null; selectedHandIdx = null; renderHand();
+                            setActionText("تم إلغاء نزول الأسطورة", "#ffcc00"); return;
+                        }
+                        let bIdx = pendingLegendPlay.burnedIndices.indexOf(index);
+                        if (bIdx > -1) pendingLegendPlay.burnedIndices.splice(bIdx, 1);
+                        else pendingLegendPlay.burnedIndices.push(index);
+                        
+                        if (pendingLegendPlay.burnedIndices.length === pendingLegendPlay.reqBurns) executeLegendPlay();
+                        else renderHand();
+                        return;
+                    }
+
+                    selectedHandIdx = index; renderHand(); document.getElementById('plr-slots').classList.remove('highlight-attack'); 
+                };
+                hand.appendChild(div);
+            });
+        }
+
+        function renderTable() {
+            const pSlots = document.querySelectorAll('#plr-slots .slot');
+            const oSlots = document.querySelectorAll('#opp-slots .slot');
+            pCardsOnTable.forEach((card, i) => {
+                pSlots[i].innerHTML = card ? createCardHTML(card, 'player') : '';
+                if(card) pSlots[i].classList.add('filled'); else pSlots[i].classList.remove('filled');
+                if(attackSelection.includes(i)) pSlots[i].classList.add('selected-attacker');
+                else pSlots[i].classList.remove('selected-attacker');
+            });
+            oCardsOnTable.forEach((card, i) => {
+                oSlots[i].innerHTML = card ? createCardHTML(card, 'opp') : '';
+            });
+        }
+
+        function createCardHTML(card, side) {
+            let extraClass = card.legend ? "legend-card-style" : "";
+            return `
+                <div class="card-inner">
+                    <div class="card-back">بونطو</div>
+                    <div class="card-front ${extraClass}" style="border-color: ${side === 'player' ? '#004aad' : '#c00000'}">
+                        <div class="card-power ${card.type}">${card.display}</div>
+                        <div class="card-name">${card.name}</div>
+                    </div>
+                </div>`;
+        }
+
+        function clickSlot(idx) {
+            if (pendingLegendPlay) return; 
+            if (!isSetupPhase && (!isPlayerTurn || isResolving)) return;
+            
+            if (isSelectingAttacker) {
+                let striker = pCardsOnTable[idx];
+                if (!striker || striker.attack === 0) { setActionText("اختار كارت هجوم مش مدافع فاضي!", "#ff4444"); return; }
+
+                let hasPele = attackSelection.some(id => pCardsOnTable[id].legend === 'pele');
+                if ((hasPele && !attackSelection.includes(idx)) || (striker.legend === 'pele' && attackSelection.length > 0)) {
+                    setActionText("بيليه يهجم منفرداً فقط!", "#ff4444"); return;
+                }
+
+                if(attackSelection.includes(idx)) {
+                    attackSelection = attackSelection.filter(id => id !== idx); 
+                } else {
+                    if(attackSelection.length >= 2) { setActionText("آخرك مهاجمين اتنين بس!", "#ffcc00"); return; }
+                    let futureCost = striker.legend === 'pele' ? 1 : (attackSelection.length + 1) + 1; 
+                    if (futureCost > pMoves) { setActionText(`معكش حركات! الهجوم ده محتاج ${futureCost}`, "#ff4444"); return; }
+                    attackSelection.push(idx);
+                }
+                
+                renderTable();
+                
+                if(attackSelection.length > 0) {
+                    let cost = attackSelection.some(id => pCardsOnTable[id].legend === 'pele') ? 1 : attackSelection.length + 1;
+                    document.getElementById('confirm-attack-btn').style.display = 'block';
+                    document.getElementById('confirm-attack-btn').innerText = `تأكيد الهجوم (يخصم ${cost} حركة)`;
+                    setActionText(`اخترت المهاجمين..`, "#00e5ff");
+                } else {
+                    document.getElementById('confirm-attack-btn').style.display = 'none';
+                    setActionText("اختار مهاجم أو اتنين من الملعب..", "#00e5ff");
+                }
+                return;
+            }
+
+            if (selectedHandIdx !== null) {
+                let cardInHand = myHandCards[selectedHandIdx];
+                let cardOnTable = pCardsOnTable[idx];
+
+                if (cardInHand.legend) {
+                    let reqBurns = 2; 
+                    if (myHandCards.length - 1 < reqBurns) { setActionText(`عشان تنزل أسطورة لازم تحرق ${reqBurns} كروت!`, "#ff4444"); return; }
+                    pendingLegendPlay = { slot: idx, reqBurns: reqBurns, legendCard: cardInHand, burnedIndices: [] };
+                    setActionText(`اختار ${reqBurns} كروت من إيدك تحرقهم ضريبة للأسطورة!`, "#ff4444");
+                    renderHand(); return;
+                }
+
+                myHandCards.splice(selectedHandIdx, 1); pCardsOnTable[idx] = cardInHand; selectedHandIdx = null;
+
+                if (!isSetupPhase) {
+                    pMoves--; updateMovesBadge();
+                    setActionText(cardOnTable ? "نزلت الكارت والقديم اتحرق 🔥 (-1 حركة)" : "نزلت كارت! (-1 حركة)", "#38b000");
+                    if(pMoves <= 0) setTimeout(endTurn, 1000);
+                } else {
+                    setActionText(cardOnTable ? "نزلت الكارت والقديم اتحرق 🔥" : "نزلت الكارت! ✅", "#38b000");
+                }
+                renderHand(); renderTable();
+            } else {
+                if(isSetupPhase) setActionText("اختار كارت من إيدك الأول!", "#ffcc00");
+            }
+        }
+
+        function executeLegendPlay() {
+            let legendCard = pendingLegendPlay.legendCard;
+            let slot = pendingLegendPlay.slot;
+            let cardsToRemove = [...pendingLegendPlay.burnedIndices, myHandCards.indexOf(legendCard)].sort((a,b) => b - a);
+            for(let i of cardsToRemove) { myHandCards.splice(i, 1); }
+            pCardsOnTable[slot] = legendCard; pendingLegendPlay = null; selectedHandIdx = null;
+            
+            if(!isSetupPhase) { pMoves--; updateMovesBadge(); setActionText("نزل الأسطورة! 🔥 (-1 حركة)", "#d35400"); if(pMoves <= 0) setTimeout(endTurn, 1000); }
+            else { setActionText("نزل الأسطورة! الكروت اتحرقت 🔥", "#d35400"); }
+            renderHand(); renderTable();
+        }
+
+        function initiateAttackMode() {
+            if (!isPlayerTurn || pMoves < 1) { setActionText("لازم حركة على الأقل للهجوم!", "#ff4444"); return; }
+            isSelectingAttacker = true; attackSelection = []; selectedHandIdx = null; 
+            document.getElementById('attack-btn').style.display = 'none';
+            document.getElementById('plr-slots').classList.add('highlight-attack');
+            setActionText(`اختر مهاجمين ⚔️`, "#00e5ff");
+            renderHand(); renderTable();
+        }
+
+        function confirmAttack() {
+            if(attackSelection.length === 0) return;
+            isSelectingAttacker = false; isResolving = true;
+            document.getElementById('plr-slots').classList.remove('highlight-attack');
+            document.getElementById('confirm-attack-btn').style.display = 'none';
+            document.getElementById('attack-btn').style.display = 'none'; 
+            document.getElementById('end-turn-btn').style.display = 'none';
+
+            let isPele = attackSelection.some(idx => pCardsOnTable[idx].legend === 'pele');
+            pMoves -= isPele ? 1 : attackSelection.length + 1; updateMovesBadge();
+
+            let strikerNames = [];
+            attackSelection.forEach(idx => { strikerNames.push(pCardsOnTable[idx].name); document.querySelectorAll('#plr-slots .slot')[idx].classList.add('revealed'); });
+
+            let oppCardsWithIdx = oCardsOnTable.map((c, i) => ({card: c, idx: i})).filter(item => item.card);
+            let yashinPresent = oppCardsWithIdx.some(item => item.card.legend === 'yashin');
+            let isMaradona = attackSelection.some(idx => pCardsOnTable[idx].legend === 'maradona');
+
+            setTimeout(() => {
+                document.getElementById('trailerAttackOverlay').style.display = 'flex';
+                document.getElementById('trailerStatus').innerText = `هجوم بـ: ${strikerNames.join(' + ')}`;
+                document.getElementById('trailerCardDisplay').style.display = 'none';
+                document.getElementById('trailerDetails').innerHTML = yashinPresent ? "<span style='color:#ff4444'>تحذير: ياشين موجود ويبطل جميع قدرات الأساطير!</span><br><br>" : "";
+                
+                if (isMaradona && !yashinPresent) {
+                    document.getElementById('maradonaPredictionBox').style.display = 'flex';
+                    document.getElementById('drawBontoBtn').style.display = 'none';
+                } else {
+                    document.getElementById('maradonaPredictionBox').style.display = 'none';
+                    document.getElementById('drawBontoBtn').style.display = 'block';
+                }
+                document.getElementById('closeAttackBtn').style.display = 'none';
+            }, 800);
+        }
+
+        function executeTrailerBonto(maradonaGuess = null) {
+            document.getElementById('drawBontoBtn').style.display = 'none';
+            document.getElementById('maradonaPredictionBox').style.display = 'none';
+            
+            let totalAtkPower = 0;
+            attackSelection.forEach(idx => { totalAtkPower += pCardsOnTable[idx].attack; });
+
+            let oppCardsWithIdx = oCardsOnTable.map((c, i) => ({card: c, idx: i})).filter(item => item.card);
+            let yashinPresent = oppCardsWithIdx.some(item => item.card.legend === 'yashin');
+
+            let drawnBonto = drawCard();
+            let bontoVal = drawnBonto.attack || drawnBonto.defense; 
+            let drawnTypeCategory = drawnBonto.type === 'atk' ? 'atk' : 'def'; 
+            
+            let finalPower = totalAtkPower + bontoVal;
+            let specialActionText = "";
+            let instantGoal = false;
+
+            if (!yashinPresent) {
+                // مارادونا
+                let isMaradona = attackSelection.some(idx => pCardsOnTable[idx].legend === 'maradona');
+                if (isMaradona && maradonaGuess) {
+                    if (drawnTypeCategory === maradonaGuess) {
+                        specialActionText += "<br><span style='color:#ffcc00'>توقع مارادونا صحيح! (يد الله) - هدف محقق!</span>";
+                        instantGoal = true;
+                    } else {
+                        specialActionText += "<br><span style='color:#ff4444'>توقع مارادونا خاطئ! ضاع دعم الكارت!</span>";
+                        bontoVal = 0; finalPower = totalAtkPower;
+                    }
+                }
+                // زيدان
+                let isZidane = attackSelection.some(idx => pCardsOnTable[idx].legend === 'zidane');
+                if (isZidane) { specialActionText += "<br><span style='color:#00e5ff'>لمسة زيدان السحرية! (+3 قوة)</span>"; finalPower += 3; }
+                
+                // بيليه
+                let isPele = attackSelection.some(idx => pCardsOnTable[idx].legend === 'pele');
+                if (isPele && bontoVal > 0) { specialActionText += "<br><span style='color:#ffcc00'>جوهرة بيليه! (قوة الكارت المسحوب تتضاعف)</span>"; finalPower += bontoVal; }
+            }
+
+            // دفاع الخصم
+            let oppDefenders = oppCardsWithIdx.filter(item => item.card.defense > 0 || item.card.type === 'def' || item.card.type === 'gk');
+            
+            // رونالدينهو
+            let isRonaldinho = attackSelection.some(idx => pCardsOnTable[idx].legend === 'ronaldinho');
+            if (isRonaldinho && !yashinPresent && oppDefenders.length > 0) {
+                oppDefenders.sort((a,b) => (b.card.defense || b.card.attack) - (a.card.defense || a.card.attack));
+                specialActionText += `<br><span style='color:#00e5ff'>رونالدينهو يراوغ ${oppDefenders[0].card.name} (تم إلغاء دفاعه)!</span>`;
+                oppDefenders[0].power = 0; 
+            }
+
+            let totalDefPower = 0;
+            oppDefenders.forEach(def => {
+                totalDefPower += (def.power !== undefined ? def.power : (def.card.defense || def.card.attack));
+                document.querySelectorAll('#opp-slots .slot')[def.idx].classList.add('revealed');
+            });
+
+            let tCard = document.getElementById('trailerCardDisplay');
+            tCard.style.display = 'flex'; 
+            tCard.innerHTML = `<div style="font-size: 20px;">${drawnBonto.name}</div><div>${bontoVal}</div>`;
+            tCard.style.color = drawnBonto.type === 'atk' ? '#c00000' : '#004aad';
+
+            let res = `قوة هجومك: ${totalAtkPower} + ${bontoVal} (دعم) = ${finalPower}<br>دفاع الخصم: ${totalDefPower}<br>${specialActionText}<br><br>`;
+            if (instantGoal || finalPower > totalDefPower) {
+                res += "<span style='color:#38b000; font-size:35px; font-weight:bold;'>جـــــــووووول! ⚽</span>";
+                pScore++; 
+            } else {
+                res += "<span style='color:#ff4444; font-size:35px; font-weight:bold;'>هجمة ضائعة! ❌</span>";
+            }
+            attackSelection.forEach(idx => { pCardsOnTable[idx] = null; });
+            
+            updateScoreBoard();
+            document.getElementById('trailerDetails').innerHTML += res;
+            document.getElementById('closeAttackBtn').style.display = 'block';
+        }
+
+        function finishTrailerAttack() {
+            document.getElementById('trailerAttackOverlay').style.display = 'none';
+            document.getElementById('trailerDetails').innerHTML = '';
+            attackSelection = []; isResolving = false;
+            renderTable(); renderHand();
+            
+            if (pMoves <= 0) {
+                endTurn();
+            } else {
+                setActionText("كمل لعب أو انهي الدور!", "#38b000");
+                document.getElementById('attack-btn').style.display = 'block';
+                document.getElementById('end-turn-btn').style.display = 'block';
+            }
+        }
+
+        function endTurn() {
+            if (!isPlayerTurn) return;
+            isPlayerTurn = false;
+            document.getElementById('attack-btn').style.display = 'none';
+            document.getElementById('end-turn-btn').style.display = 'none';
+            document.getElementById('moves-badge').style.display = 'none';
+            setActionText("دور الخصم...", "#c00000");
+            setTimeout(oppTurn, 1500);
+        }
+
+        function oppTurn() {
+            let emptySlots = [];
+            oCardsOnTable.forEach((c, i) => { if (!c) emptySlots.push(i); });
+            emptySlots.forEach(idx => { oCardsOnTable[idx] = drawNonLegendCard(); });
+            renderTable();
+            
+            setTimeout(() => {
+                let oppAttackers = oCardsOnTable.map((c, i) => ({card: c, idx: i})).filter(item => item.card && item.card.attack > 0 && !item.card.legend);
+                
+                if (oppAttackers.length > 0) {
+                    let attacker = oppAttackers[0];
+                    setActionText(`الخصم يهجم بـ ${attacker.card.name}!`, "#ff4444");
+                    document.querySelectorAll('#opp-slots .slot')[attacker.idx].classList.add('revealed');
+                    
+                    setTimeout(() => {
+                        let totalDef = 0;
+                        pCardsOnTable.forEach((c, i) => { 
+                            if(c && (c.defense > 0 || c.type === 'gk' || c.type === 'def')) {
+                                totalDef += c.defense || c.attack;
+                                document.querySelectorAll('#plr-slots .slot')[i].classList.add('revealed');
+                            }
+                        });
+                        
+                        if (attacker.card.attack > totalDef) {
+                            oScore++; 
+                            setActionText("الخصم سجل هدف! ❌", "#ff4444"); 
+                        } else {
+                            setActionText("دفاعك صد الهجمة! 🛡️", "#38b000"); 
+                        }
+                        
+                        oCardsOnTable[attacker.idx] = null; 
+                        updateScoreBoard(); 
+                        renderTable();
+                        setTimeout(startPlayerTurn, 2000);
+                    }, 2000);
+                } else {
+                    setActionText("الخصم بيدافع..", "#c00000");
+                    setTimeout(startPlayerTurn, 1500);
+                }
+            }, 1000);
+        }
+    </script>
+</body>
+</html>
